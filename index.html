@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SQLi Shield — Secure Login</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡</text></svg>" />
+  <script>
+    // ── Tab switching (defined early so buttons are immediately interactive) ──
+    function switchTab(name, event) {
+      document.querySelectorAll(".tab-pane").forEach(p => p.classList.remove("active"));
+      document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+      document.getElementById("tab-" + name).classList.add("active");
+      if (event && event.currentTarget) {
+        event.currentTarget.classList.add("active");
+      } else if (event && event.target) {
+        event.target.classList.add("active");
+      }
+    }
+  </script>
+</head>
+<body>
+  <!-- Animated particle background -->
+  <canvas id="particle-canvas"></canvas>
+
+  <div class="page-wrapper auth-page">
+    <div class="auth-card">
+      <!-- Logo -->
+      <div class="auth-logo">
+        <span class="auth-logo__icon">🛡</span>
+        <div class="auth-logo__title">SQLi Shield</div>
+        <div class="auth-logo__sub">SQL Injection Detection &amp; Data Leak Prevention</div>
+      </div>
+
+      <!-- Tab bar -->
+      <div class="tab-bar" role="tablist">
+        <button class="tab-btn active" onclick="switchTab('login', event)" role="tab">Login</button>
+        <button class="tab-btn" onclick="switchTab('register', event)" role="tab">Register</button>
+        <button class="tab-btn" onclick="switchTab('recover', event)" role="tab">Recover</button>
+      </div>
+
+      <!-- ── LOGIN PANE ── -->
+      <div id="tab-login" class="tab-pane active">
+        <div id="login-error" class="alert alert--danger" style="display:none;"></div>
+
+        <div class="form-group">
+          <label for="login-email">Email Address</label>
+          <input type="email" id="login-email" data-sqli-check placeholder="you@example.com" autocomplete="email" />
+        </div>
+
+        <div class="form-group">
+          <label for="login-password">Password</label>
+          <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password" />
+        </div>
+
+        <button class="btn btn--primary mt-8" id="login-btn" onclick="handleLogin()">
+          🔐 Sign In
+        </button>
+
+        <p class="text-center mt-16" style="font-size:0.82rem; color:var(--text-muted);">
+          Don't have an account?
+          <a href="#" onclick="switchTab('register', event)">Register free</a>
+        </p>
+      </div>
+
+      <!-- ── REGISTER PANE ── -->
+      <div id="tab-register" class="tab-pane">
+        <div id="register-error" class="alert alert--danger" style="display:none;"></div>
+
+        <div class="form-group">
+          <label for="reg-name">Display Name</label>
+          <input type="text" id="reg-name" data-sqli-check placeholder="Jane Doe" autocomplete="name" />
+        </div>
+
+        <div class="form-group">
+          <label for="reg-email">Email Address</label>
+          <input type="email" id="reg-email" data-sqli-check placeholder="you@example.com" autocomplete="email" />
+        </div>
+
+        <div class="form-group">
+          <label for="reg-password">Password</label>
+          <input type="password" id="reg-password" placeholder="Min. 8 characters" autocomplete="new-password" />
+        </div>
+
+        <div class="form-group">
+          <label for="reg-confirm">Confirm Password</label>
+          <input type="password" id="reg-confirm" placeholder="Repeat password" autocomplete="new-password" />
+        </div>
+
+        <button class="btn btn--primary mt-8" id="register-btn" onclick="handleRegister()">
+          🚀 Create Account
+        </button>
+
+        <p class="text-center mt-16" style="font-size:0.82rem; color:var(--text-muted);">
+          Already have an account?
+          <a href="#" onclick="switchTab('login', event)">Sign in</a>
+        </p>
+      </div>
+
+      <!-- ── RECOVER PANE ── -->
+      <div id="tab-recover" class="tab-pane">
+        <div class="alert alert--warning mb-16">
+          ⚠ A password reset link will be sent to your email.
+        </div>
+
+        <div id="recover-success" class="alert alert--success" style="display:none;"></div>
+        <div id="recover-error" class="alert alert--danger" style="display:none;"></div>
+
+        <div class="form-group">
+          <label for="recover-email">Registered Email</label>
+          <input type="email" id="recover-email" data-sqli-check placeholder="you@example.com" />
+        </div>
+
+        <button class="btn btn--primary" id="recover-btn" onclick="handleRecover()">
+          📧 Send Reset Link
+        </button>
+
+        <p class="text-center mt-16" style="font-size:0.82rem;">
+          <a href="#" onclick="switchTab('login', event)">← Back to Login</a>
+        </p>
+      </div>
+
+      <!-- Demo credentials note -->
+      <div style="margin-top:24px; padding:12px; background:rgba(0,255,136,0.05); border-radius:8px; font-size:0.78rem; color:var(--text-muted); text-align:center;">
+        🔒 Protected by AES-256 encryption + double-layer SQL injection detection<br/>
+        <span style="color:var(--accent-green);">CodeAlpha Cloud Computing Internship Project</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast container -->
+  <div id="toast-container"></div>
+
+  <!-- Appwrite SDK -->
+  <script src="appwrite-sdk.js"></script>
+  <!-- App config & script -->
+  <script src="appwrite-config.js"></script>
+  <script src="script.js"></script>
+  <script>
+
+    // ── Check existing session on load ─────────────────────
+    (async () => {
+      const user = await AuthManager.getSession();
+      if (user) window.location.href = "dashboard.html";
+    })();
+
+    // ── Login handler ──────────────────────────────────────
+    async function handleLogin() {
+      const email    = document.getElementById("login-email").value.trim();
+      const password = document.getElementById("login-password").value;
+      const errEl    = document.getElementById("login-error");
+      const btn      = document.getElementById("login-btn");
+      errEl.style.display = "none";
+
+      // Layer 1: SQLi check on email
+      const check = SQLiDetector.analyze(email);
+      if (!check.safe) {
+        await SecurityLogger.log({
+          userId: "anonymous", userEmail: email,
+          suspiciousInput: email, threatLevel: check.highestLevel,
+          attackType: check.threats[0].type, blocked: true,
+        });
+        showToast("🚨 SQL injection detected in email field!", "error");
+        return;
+      }
+
+      if (!email || !password) {
+        errEl.textContent = "Please fill in all fields.";
+        errEl.style.display = "flex";
+        return;
+      }
+
+      setLoading(btn, true);
+      try {
+        await AuthManager.login(email, password);
+        showToast("Login successful! Redirecting…", "success");
+        setTimeout(() => window.location.href = "dashboard.html", 800);
+      } catch (e) {
+        errEl.textContent = "Invalid email or password. Please try again.";
+        errEl.style.display = "flex";
+        setLoading(btn, false);
+      }
+    }
+
+    // ── Register handler ───────────────────────────────────
+    async function handleRegister() {
+      const name     = document.getElementById("reg-name").value.trim();
+      const email    = document.getElementById("reg-email").value.trim();
+      const password = document.getElementById("reg-password").value;
+      const confirm  = document.getElementById("reg-confirm").value;
+      const errEl    = document.getElementById("register-error");
+      const btn      = document.getElementById("register-btn");
+      errEl.style.display = "none";
+
+      // Layer 1 checks
+      for (const [field, val] of [["name", name], ["email", email]]) {
+        const r = SQLiDetector.analyze(val);
+        if (!r.safe) {
+          showToast(`🚨 Injection pattern in ${field}!`, "error");
+          return;
+        }
+      }
+
+      if (!name || !email || !password) {
+        errEl.textContent = "All fields are required.";
+        errEl.style.display = "flex";
+        return;
+      }
+      if (password.length < 8) {
+        errEl.textContent = "Password must be at least 8 characters.";
+        errEl.style.display = "flex";
+        return;
+      }
+      if (password !== confirm) {
+        errEl.textContent = "Passwords do not match.";
+        errEl.style.display = "flex";
+        return;
+      }
+
+      setLoading(btn, true);
+      try {
+        await AuthManager.register(email, password, name);
+        showToast("Account created! Redirecting…", "success");
+        setTimeout(() => window.location.href = "dashboard.html", 900);
+      } catch (e) {
+        errEl.textContent = e.message || "Registration failed. Email may already be in use.";
+        errEl.style.display = "flex";
+        setLoading(btn, false);
+      }
+    }
+
+    // ── Recover handler ────────────────────────────────────
+    async function handleRecover() {
+      const email   = document.getElementById("recover-email").value.trim();
+      const succEl  = document.getElementById("recover-success");
+      const errEl   = document.getElementById("recover-error");
+      const btn     = document.getElementById("recover-btn");
+      succEl.style.display = errEl.style.display = "none";
+
+      const check = SQLiDetector.analyze(email);
+      if (!check.safe) {
+        showToast("🚨 Suspicious input detected!", "error");
+        return;
+      }
+
+      setLoading(btn, true);
+      try {
+        await AuthManager.sendPasswordRecovery(email);
+        succEl.textContent = "✓ Recovery email sent! Check your inbox.";
+        succEl.style.display = "flex";
+      } catch (e) {
+        errEl.textContent = "Could not send recovery email. Is the address registered?";
+        errEl.style.display = "flex";
+      }
+      setLoading(btn, false);
+    }
+
+    // Allow Enter key to submit
+    document.addEventListener("keydown", e => {
+      if (e.key === "Enter") {
+        const active = document.querySelector(".tab-pane.active")?.id;
+        if (active === "tab-login")    handleLogin();
+        if (active === "tab-register") handleRegister();
+        if (active === "tab-recover")  handleRecover();
+      }
+    });
+  </script>
+</body>
+</html>

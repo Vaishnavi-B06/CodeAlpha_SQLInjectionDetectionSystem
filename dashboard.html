@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SQLi Shield — Dashboard</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡</text></svg>" />
+  <script>
+    // ── Show Section (defined early so sidebar navigation is immediately interactive) ──
+    function showSection(id, event) {
+      document.querySelectorAll(".page-section").forEach(s => s.classList.remove("active"));
+      document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
+      document.getElementById("section-" + id).classList.add("active");
+      if (event && event.currentTarget) {
+        event.currentTarget.classList.add("active");
+      } else if (event && event.target) {
+        event.target.classList.add("active");
+      }
+      if (id === "my-logs" && typeof loadMyLogs === "function") loadMyLogs();
+      const sidebar = document.getElementById("sidebar");
+      if (sidebar) sidebar.classList.remove("open");
+    }
+  </script>
+</head>
+<body>
+  <canvas id="particle-canvas"></canvas>
+
+  <!-- Mobile nav toggle -->
+  <button class="mobile-nav-toggle" onclick="toggleSidebar()">☰</button>
+
+  <div class="page-wrapper app-layout">
+    <!-- ══ SIDEBAR ══ -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__logo">
+        <div class="sidebar__logo-text">🛡 SQLi Shield</div>
+        <div class="sidebar__logo-sub">Security Dashboard</div>
+      </div>
+
+      <nav>
+        <a class="nav-item active" onclick="showSection('overview', event)" href="#">
+          <span class="nav-item__icon">📊</span> Overview
+        </a>
+        <a class="nav-item" onclick="showSection('test-lab', event)" href="#">
+          <span class="nav-item__icon">🔬</span> Injection Lab
+        </a>
+        <a class="nav-item" onclick="showSection('secure-form', event)" href="#">
+          <span class="nav-item__icon">📝</span> Secure Form
+        </a>
+        <a class="nav-item" onclick="showSection('my-logs', event)" href="#">
+          <span class="nav-item__icon">📋</span> My Logs
+        </a>
+        <a class="nav-item" onclick="showSection('architecture', event)" href="#">
+          <span class="nav-item__icon">🏗</span> Architecture
+        </a>
+        <a class="nav-item" id="admin-link" onclick="window.location.href='admin.html'" href="#" style="display:none;">
+          <span class="nav-item__icon">⚙️</span> Admin Panel
+        </a>
+      </nav>
+
+      <div class="sidebar__spacer"></div>
+
+      <div class="sidebar__user">
+        <div class="sidebar__user-name" id="sidebar-name">Loading…</div>
+        <div class="sidebar__user-role role--user" id="sidebar-role">user</div>
+        <button class="btn btn--secondary btn--sm mt-8 w-full" onclick="handleLogout()">
+          🚪 Logout
+        </button>
+      </div>
+    </aside>
+
+    <!-- ══ MAIN CONTENT ══ -->
+    <main class="main-content">
+
+      <!-- ─── OVERVIEW SECTION ─── -->
+      <section id="section-overview" class="page-section active">
+        <div class="section-header">
+          <h2>Security Overview</h2>
+          <p>Real-time monitoring of your session and threat activity.</p>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-card stat-card--green">
+            <div class="stat-card__label">Total Requests</div>
+            <div class="stat-card__value" id="stat-total">0</div>
+            <div class="stat-card__icon">📡</div>
+          </div>
+          <div class="stat-card stat-card--red">
+            <div class="stat-card__label">Blocked Attacks</div>
+            <div class="stat-card__value" id="stat-blocked">0</div>
+            <div class="stat-card__icon">🚫</div>
+          </div>
+          <div class="stat-card stat-card--yellow">
+            <div class="stat-card__label">Threats Detected</div>
+            <div class="stat-card__value" id="stat-threats">0</div>
+            <div class="stat-card__icon">⚠</div>
+          </div>
+          <div class="stat-card stat-card--blue">
+            <div class="stat-card__label">Login Count</div>
+            <div class="stat-card__value" id="stat-logins">0</div>
+            <div class="stat-card__icon">🔐</div>
+          </div>
+        </div>
+
+        <!-- User profile card -->
+        <div class="card">
+          <h3>👤 Your Secure Profile</h3>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+            <div>
+              <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:6px;">Display Name</div>
+              <div id="profile-name" style="font-weight:600;">—</div>
+            </div>
+            <div>
+              <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:6px;">Email (AES-256 Protected)</div>
+              <div id="profile-email" class="text-mono" style="font-size:0.88rem;">—</div>
+            </div>
+            <div>
+              <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:6px;">Account Role</div>
+              <div id="profile-role">—</div>
+            </div>
+            <div>
+              <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:6px;">Last Login</div>
+              <div id="profile-login" style="font-size:0.88rem; color:var(--text-secondary);">—</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Recent alerts -->
+        <div class="card">
+          <h3>🚨 Recent Security Alerts (This Session)</h3>
+          <div id="session-alerts">
+            <div class="empty-state">✅ No threats detected in this session.</div>
+          </div>
+        </div>
+
+        <!-- Activity graph (simple canvas-based) -->
+        <div class="card">
+          <h3>📈 Threat Activity Chart</h3>
+          <canvas id="threat-chart" height="160" style="width:100%;"></canvas>
+        </div>
+      </section>
+
+      <!-- ─── INJECTION LAB SECTION ─── -->
+      <section id="section-test-lab" class="page-section">
+        <div class="section-header">
+          <h2>🔬 SQL Injection Test Lab</h2>
+          <p>Test inputs against the detection engine. Try real attack patterns to see them blocked.</p>
+        </div>
+
+        <div class="alert alert--warning">
+          ⚠ This lab is for <strong>educational demonstration only</strong>. Inputs are analyzed client-side; nothing is sent to a real database.
+        </div>
+
+        <div class="test-lab">
+          <div class="card" style="margin-bottom:0;">
+            <h3>Input Analyzer</h3>
+            <div class="form-group">
+              <label for="lab-input">Test Input</label>
+              <textarea id="lab-input" rows="5" placeholder="Type or paste a SQL injection payload here…
+e.g.  ' OR 1=1 --
+      UNION SELECT * FROM users
+      DROP TABLE accounts"></textarea>
+            </div>
+            <div style="display:flex; gap:10px; flex-wrap:wrap;">
+              <button class="btn btn--primary" style="flex:1;" onclick="runLabTest()">▶ Analyze</button>
+              <button class="btn btn--secondary" onclick="loadSample()">Load Sample</button>
+              <button class="btn btn--secondary" onclick="clearLab()">Clear</button>
+            </div>
+
+            <!-- Quick sample buttons -->
+            <div style="margin-top:14px;">
+              <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:8px; text-transform:uppercase; letter-spacing:1px;">Quick Samples</div>
+              <div style="display:flex; flex-wrap:wrap; gap:6px;">
+                <button class="btn btn--secondary btn--sm" onclick="setSample(`' OR 1=1 --`)">OR 1=1</button>
+                <button class="btn btn--secondary btn--sm" onclick="setSample(`UNION SELECT username, password FROM users`)">UNION SELECT</button>
+                <button class="btn btn--secondary btn--sm" onclick="setSample(`DROP TABLE accounts; --`)">DROP TABLE</button>
+                <button class="btn btn--secondary btn--sm" onclick="setSample(`1'; EXEC xp_cmdshell('whoami')`)">xp_cmdshell</button>
+                <button class="btn btn--secondary btn--sm" onclick="setSample(`SLEEP(5)`)">Time-Based</button>
+                <button class="btn btn--secondary btn--sm" onclick="setSample(`Hello World`)">Safe Input</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="card" style="margin-bottom:0;">
+            <h3>Detection Result</h3>
+            <div id="lab-result" class="test-result">
+              <div style="text-align:center; padding:30px; color:var(--text-muted);">
+                Run an analysis to see results here.
+              </div>
+            </div>
+
+            <div style="margin-top:20px;">
+              <h3 style="border:none; margin-bottom:12px; padding-bottom:0; font-size:0.88rem; color:var(--text-muted);">PATTERN LIBRARY</h3>
+              <div style="font-size:0.8rem; color:var(--text-secondary); line-height:2;">
+                <span class="badge badge--critical">CRITICAL</span> DROP, EXEC, xp_cmdshell, INSERT, DELETE<br/>
+                <span class="badge badge--high">HIGH</span> OR 1=1, Comment injection, UNION SELECT, Schema enum<br/>
+                <span class="badge badge--medium">MEDIUM</span> SELECT FROM, SLEEP(), BENCHMARK, WAITFOR<br/>
+                <span class="badge badge--low">LOW</span> Quote injection, Hex encoding, CHAR() encoding
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ─── SECURE FORM SECTION ─── -->
+      <section id="section-secure-form" class="page-section">
+        <div class="section-header">
+          <h2>📝 Secure Data Submission</h2>
+          <p>All inputs are checked by Layer 1 (SQLi detection) before being encrypted and stored.</p>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:24px;">
+          <div class="card" style="margin-bottom:0;">
+            <h3>Submit Secure Record</h3>
+
+            <div class="form-group">
+              <label for="form-title">Record Title</label>
+              <input type="text" id="form-title" data-sqli-check placeholder="Project Alpha Report" />
+            </div>
+
+            <div class="form-group">
+              <label for="form-content">Sensitive Content</label>
+              <textarea id="form-content" data-sqli-check rows="4" placeholder="Enter sensitive information…"></textarea>
+            </div>
+
+            <div class="form-group">
+              <label for="form-category">Category</label>
+              <select id="form-category">
+                <option value="personal">Personal Data</option>
+                <option value="financial">Financial</option>
+                <option value="medical">Medical</option>
+                <option value="credentials">Credentials</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+
+            <button class="btn btn--primary" id="form-btn" onclick="submitSecureForm()">
+              🔒 Encrypt &amp; Submit
+            </button>
+          </div>
+
+          <div class="card" style="margin-bottom:0;">
+            <h3>Submitted Records (This Session)</h3>
+            <div id="submitted-records">
+              <div class="empty-state">No records submitted yet.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ─── MY LOGS SECTION ─── -->
+      <section id="section-my-logs" class="page-section">
+        <div class="section-header">
+          <h2>📋 My Security Logs</h2>
+          <p>All suspicious inputs detected during your sessions.</p>
+        </div>
+
+        <div class="card">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+            <h3 style="border:none; padding-bottom:0; margin-bottom:0;">Detection History</h3>
+            <button class="btn btn--secondary btn--sm" onclick="loadMyLogs()">↻ Refresh</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Attack Type</th>
+                  <th>Threat Level</th>
+                  <th>Status</th>
+                  <th>Input Preview</th>
+                </tr>
+              </thead>
+              <tbody id="my-logs-body">
+                <tr><td colspan="5" class="empty-state">No logs yet.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ─── ARCHITECTURE SECTION ─── -->
+      <section id="section-architecture" class="page-section">
+        <div class="section-header">
+          <h2>🏗 Security Architecture</h2>
+          <p>How SQLi Shield's double-layer protection works end-to-end.</p>
+        </div>
+
+        <div class="card">
+          <h3>System Flow</h3>
+          <div class="arch-diagram">
+            <div class="arch-node">
+              <div class="arch-node__icon">👤</div>
+              <div class="arch-node__label">User Input</div>
+            </div>
+            <div class="arch-arrow">→</div>
+            <div class="arch-node" style="border-color:rgba(0,255,136,0.4);">
+              <div class="arch-node__icon">🔍</div>
+              <div class="arch-node__label">Layer 1<br/><small style="color:var(--accent-green);font-size:0.7rem;">Pattern Detection</small></div>
+            </div>
+            <div class="arch-arrow">→</div>
+            <div class="arch-node" style="border-color:rgba(0,170,255,0.4);">
+              <div class="arch-node__icon">🔐</div>
+              <div class="arch-node__label">Layer 2<br/><small style="color:var(--accent-blue);font-size:0.7rem;">Auth + RBAC</small></div>
+            </div>
+            <div class="arch-arrow">→</div>
+            <div class="arch-node" style="border-color:rgba(255,204,0,0.4);">
+              <div class="arch-node__icon">☁️</div>
+              <div class="arch-node__label">Appwrite<br/><small style="color:var(--accent-yellow);font-size:0.7rem;">Cloud DB</small></div>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:24px;">
+          <div class="card" style="margin-bottom:0;">
+            <h3>🛡 Layer 1 — Input Security</h3>
+            <ul style="color:var(--text-secondary); font-size:0.88rem; line-height:2.2; padding-left:0; list-style:none;">
+              <li>✅ Real-time SQL injection pattern matching</li>
+              <li>✅ 24+ attack patterns across 4 threat levels</li>
+              <li>✅ HTML entity decoding (evasion prevention)</li>
+              <li>✅ Input sanitization before display</li>
+              <li>✅ Client-side blocking before any network call</li>
+              <li>✅ Threat logging with timestamp and context</li>
+            </ul>
+          </div>
+
+          <div class="card" style="margin-bottom:0;">
+            <h3>🔐 Layer 2 — Access Security</h3>
+            <ul style="color:var(--text-secondary); font-size:0.88rem; line-height:2.2; padding-left:0; list-style:none;">
+              <li>✅ Appwrite session management</li>
+              <li>✅ JWT-based authentication tokens</li>
+              <li>✅ Role-based access control (Admin / User)</li>
+              <li>✅ Admin-only routes protected server-side</li>
+              <li>✅ Automatic session expiry</li>
+              <li>✅ AES-256-GCM encryption for sensitive data</li>
+            </ul>
+          </div>
+
+          <div class="card" style="margin-bottom:0;">
+            <h3>☁️ Cloud Architecture</h3>
+            <ul style="color:var(--text-secondary); font-size:0.88rem; line-height:2.2; padding-left:0; list-style:none;">
+              <li>✅ Appwrite Cloud (free tier) backend</li>
+              <li>✅ Netlify-ready static frontend</li>
+              <li>✅ No server-side code required</li>
+              <li>✅ No database credentials in frontend</li>
+              <li>✅ Appwrite handles credential storage</li>
+              <li>✅ Accessible from any modern browser</li>
+            </ul>
+          </div>
+
+          <div class="card" style="margin-bottom:0;">
+            <h3>🔒 Data Protection</h3>
+            <ul style="color:var(--text-secondary); font-size:0.88rem; line-height:2.2; padding-left:0; list-style:none;">
+              <li>✅ AES-256-GCM via Web Crypto API</li>
+              <li>✅ PBKDF2 key derivation (100k iterations)</li>
+              <li>✅ Unique salt + IV per encryption operation</li>
+              <li>✅ Passwords hashed by Appwrite (bcrypt)</li>
+              <li>✅ Sensitive fields encrypted before storage</li>
+              <li>✅ Security logs store sanitized input only</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <div id="toast-container"></div>
+
+  <script src="appwrite-sdk.js"></script>
+  <script src="appwrite-config.js"></script>
+  <script src="script.js"></script>
+  <script>
+    // ── App State ──────────────────────────────────────────
+    let sessionStats = { total: 0, blocked: 0, threats: 0 };
+    let sessionAlerts = [];
+    let submittedRecords = [];
+
+    // ── Auth Guard ─────────────────────────────────────────
+    (async () => {
+      const user = await AuthManager.getSession();
+      if (!user) { window.location.href = "index.html"; return; }
+
+      // Populate UI
+      const name = AuthManager.currentProfile?.displayName || user.name || user.email;
+      const role = AuthManager.currentProfile?.role || "user";
+      const logins = AuthManager.currentProfile?.loginCount || 1;
+      const lastLogin = formatDate(AuthManager.currentProfile?.lastLogin || new Date().toISOString());
+
+      document.getElementById("sidebar-name").textContent = name;
+      document.getElementById("sidebar-role").textContent = role;
+      document.getElementById("sidebar-role").className = `sidebar__user-role role--${role}`;
+      document.getElementById("profile-name").textContent = name;
+      document.getElementById("profile-email").textContent = user.email;
+      document.getElementById("profile-role").innerHTML = `<span class="badge badge--${role === 'admin' ? 'allowed' : 'medium'}">${role}</span>`;
+      document.getElementById("profile-login").textContent = lastLogin;
+      document.getElementById("stat-logins").textContent = logins;
+
+      if (role === "admin") {
+        document.getElementById("admin-link").style.display = "flex";
+        document.getElementById("sidebar-role").className = "sidebar__user-role role--admin";
+      }
+
+      drawThreatChart([]);
+    })();
+
+
+    function toggleSidebar() {
+      document.getElementById("sidebar").classList.toggle("open");
+    }
+
+    // ── Logout ─────────────────────────────────────────────
+    async function handleLogout() {
+      await AuthManager.logout();
+      window.location.href = "index.html";
+    }
+
+    // ── Stats updater ──────────────────────────────────────
+    function updateStats() {
+      document.getElementById("stat-total").textContent   = sessionStats.total;
+      document.getElementById("stat-blocked").textContent = sessionStats.blocked;
+      document.getElementById("stat-threats").textContent = sessionStats.threats;
+    }
+
+    // ── Alert feed ─────────────────────────────────────────
+    function addSessionAlert(entry) {
+      sessionAlerts.unshift(entry);
+      const container = document.getElementById("session-alerts");
+      container.innerHTML = sessionAlerts.slice(0, 5).map(a => `
+        <div class="alert alert--danger" style="margin-bottom:8px;">
+          <div style="flex:1;">
+            <strong>${a.attackType}</strong> — ${threatBadge(a.threatLevel)}<br/>
+            <span class="text-mono" style="font-size:0.78rem;">${SQLiDetector.sanitize(a.suspiciousInput).substring(0, 80)}…</span>
+            <div style="font-size:0.72rem; color:var(--text-muted); margin-top:4px;">${formatDate(a.timestamp)}</div>
+          </div>
+        </div>
+      `).join("");
+    }
+
+    // ── Injection Lab ──────────────────────────────────────
+    async function runLabTest() {
+      const input = document.getElementById("lab-input").value;
+      const result = SQLiDetector.analyze(input);
+      const el = document.getElementById("lab-result");
+
+      sessionStats.total++;
+      updateStats();
+
+      if (result.safe) {
+        el.className = "test-result test-result--safe show";
+        el.innerHTML = `
+          <div style="font-size:1.5rem; margin-bottom:8px;">✅</div>
+          <strong>Input appears safe</strong><br/>
+          <span style="font-size:0.84rem; opacity:0.8;">No SQL injection patterns detected.</span>
+        `;
+      } else {
+        sessionStats.blocked++;
+        sessionStats.threats++;
+        updateStats();
+
+        const entry = await SecurityLogger.log({
+          userId: AuthManager.currentUser?.$id || "demo",
+          userEmail: AuthManager.currentUser?.email || "demo",
+          suspiciousInput: input,
+          threatLevel: result.highestLevel,
+          attackType: result.threats[0].type,
+          blocked: true,
+        });
+
+        addSessionAlert(entry);
+        drawThreatChart(SecurityLogger.getLocalLogs());
+
+        el.className = "test-result test-result--threat show";
+        el.innerHTML = `
+          <div style="font-size:1.5rem; margin-bottom:8px;">🚨</div>
+          <strong>INJECTION DETECTED — BLOCKED</strong>
+          <div style="font-size:0.84rem; margin:8px 0;">
+            Highest severity: ${threatBadge(result.highestLevel)}
+          </div>
+          <ul class="threat-list">
+            ${result.threats.map(t => `<li>${t.type} — ${t.level}</li>`).join("")}
+          </ul>
+        `;
+        showToast(`🚨 ${result.threats[0].type} blocked!`, "error");
+      }
+    }
+
+    function setSample(text) {
+      document.getElementById("lab-input").value = text;
+    }
+
+    function loadSample() {
+      const samples = [
+        "' OR 1=1 --",
+        "UNION SELECT username, password FROM users --",
+        "'; DROP TABLE users; --",
+        "1 AND SLEEP(5)",
+        "admin'--",
+        "1; EXEC xp_cmdshell('whoami')",
+      ];
+      setSample(samples[Math.floor(Math.random() * samples.length)]);
+    }
+
+    function clearLab() {
+      document.getElementById("lab-input").value = "";
+      const el = document.getElementById("lab-result");
+      el.className = "test-result";
+      el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text-muted);">Run an analysis to see results here.</div>';
+    }
+
+    // ── Secure Form ────────────────────────────────────────
+    async function submitSecureForm() {
+      const title    = document.getElementById("form-title").value.trim();
+      const content  = document.getElementById("form-content").value.trim();
+      const category = document.getElementById("form-category").value;
+      const btn      = document.getElementById("form-btn");
+
+      sessionStats.total++;
+      updateStats();
+
+      for (const [f, v] of [["title", title], ["content", content]]) {
+        const r = SQLiDetector.analyze(v);
+        if (!r.safe) {
+          sessionStats.blocked++; sessionStats.threats++;
+          updateStats();
+          const entry = await SecurityLogger.log({
+            userId: AuthManager.currentUser?.$id,
+            userEmail: AuthManager.currentUser?.email,
+            suspiciousInput: v,
+            threatLevel: r.highestLevel,
+            attackType: r.threats[0].type,
+            blocked: true,
+          });
+          addSessionAlert(entry);
+          showToast(`🚨 SQL injection in ${f}! Submission blocked.`, "error");
+          return;
+        }
+      }
+
+      if (!title || !content) {
+        showToast("Please fill in all fields.", "warning");
+        return;
+      }
+
+      setLoading(btn, true);
+
+      // Encrypt sensitive content with AES-256
+      const encryptedContent = await CryptoLayer.encrypt(content);
+
+      submittedRecords.unshift({
+        title,
+        category,
+        encryptedPreview: encryptedContent.substring(0, 32) + "…",
+        time: new Date().toISOString(),
+      });
+
+      renderSubmittedRecords();
+      document.getElementById("form-title").value = "";
+      document.getElementById("form-content").value = "";
+      showToast("✅ Record encrypted and stored securely.", "success");
+      setLoading(btn, false);
+    }
+
+    function renderSubmittedRecords() {
+      const el = document.getElementById("submitted-records");
+      if (submittedRecords.length === 0) {
+        el.innerHTML = '<div class="empty-state">No records submitted yet.</div>';
+        return;
+      }
+      el.innerHTML = submittedRecords.map(r => `
+        <div style="padding:12px; border:1px solid var(--border); border-radius:8px; margin-bottom:10px; font-size:0.84rem;">
+          <div style="font-weight:700; color:var(--text-primary);">${SQLiDetector.sanitize(r.title)}</div>
+          <div style="color:var(--text-muted); margin-top:3px;">Category: ${r.category} · ${formatDate(r.time)}</div>
+          <div class="text-mono" style="font-size:0.72rem; color:var(--accent-green); margin-top:6px;">
+            🔒 AES-256: ${r.encryptedPreview}
+          </div>
+        </div>
+      `).join("");
+    }
+
+    // ── My Logs ────────────────────────────────────────────
+    async function loadMyLogs() {
+      const logs = await SecurityLogger.fetchLogs(30);
+      const myLogs = logs.filter(l =>
+        l.userId === AuthManager.currentUser?.$id || l.userId === "demo"
+      );
+      const tbody = document.getElementById("my-logs-body");
+
+      if (myLogs.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="empty-state">✅ No threats detected for your account.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = myLogs.map(l => `
+        <tr>
+          <td>${formatDate(l.timestamp)}</td>
+          <td>${SQLiDetector.sanitize(l.attackType)}</td>
+          <td>${threatBadge(l.threatLevel)}</td>
+          <td><span class="badge ${l.blocked ? 'badge--blocked' : 'badge--allowed'}">${l.blocked ? 'Blocked' : 'Allowed'}</span></td>
+          <td class="mono">${SQLiDetector.sanitize(l.suspiciousInput).substring(0, 50)}…</td>
+        </tr>
+      `).join("");
+    }
+
+    // ── Threat Chart (simple canvas bar chart) ─────────────
+    function drawThreatChart(logs) {
+      const canvas = document.getElementById("threat-chart");
+      if (!canvas) return;
+      const ctx = canvas.getContext("2d");
+      canvas.width = canvas.offsetWidth * window.devicePixelRatio || 600;
+      canvas.height = 160 * window.devicePixelRatio;
+      ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+
+      const W = canvas.offsetWidth;
+      const H = 160;
+
+      // Count by threat level
+      const counts = { LOW: 0, MEDIUM: 0, HIGH: 0, CRITICAL: 0 };
+      logs.forEach(l => { if (counts[l.threatLevel] !== undefined) counts[l.threatLevel]++; });
+
+      const labels = Object.keys(counts);
+      const values = Object.values(counts);
+      const colors = ["#ffcc00", "#ff7700", "#ff3355", "#c86aff"];
+      const max = Math.max(...values, 1);
+      const barW = 60;
+      const gap = (W - labels.length * barW) / (labels.length + 1);
+
+      ctx.clearRect(0, 0, W, H);
+
+      labels.forEach((label, i) => {
+        const x = gap + i * (barW + gap);
+        const barH = ((values[i] / max) * (H - 50)) || 4;
+        const y = H - barH - 28;
+
+        // Bar
+        ctx.fillStyle = colors[i] + "44";
+        ctx.fillRect(x, y, barW, barH);
+        ctx.fillStyle = colors[i];
+        ctx.fillRect(x, y, barW, 3);
+
+        // Label
+        ctx.fillStyle = "#8da8c8";
+        ctx.font = "11px sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText(label, x + barW / 2, H - 10);
+
+        // Value
+        ctx.fillStyle = colors[i];
+        ctx.font = "bold 14px monospace";
+        ctx.fillText(values[i], x + barW / 2, y - 6);
+      });
+    }
+  </script>
+</body>
+</html>
