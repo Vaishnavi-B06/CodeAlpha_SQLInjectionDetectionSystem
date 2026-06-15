@@ -202,13 +202,17 @@ After deploying and configuring Appwrite:
 
 ## 📸 Screenshots Section
 
-> Add screenshots after deployment:
-> - Login page
-> - User dashboard with stats
-> - Injection test lab with blocked payload
-> - Security logs table
-> - Admin panel
-> - Critical alerts view
+<img width="1883" height="907" alt="Screenshot 2026-06-14 212710" src="https://github.com/user-attachments/assets/8ea3a773-22ca-4405-b05d-b6b45ee5ac4d" />
+<img width="1890" height="905" alt="Screenshot 2026-06-14 222227" src="https://github.com/user-attachments/assets/57e79ecc-7e66-49f8-a2c0-76bcc59cd0ed" />
+<img width="1350" height="432" alt="Screenshot 2026-06-14 222338" src="https://github.com/user-attachments/assets/c49d9e26-d6d4-4c09-8633-f2f9774e31ba" />
+<img width="1207" height="827" alt="Screenshot 2026-06-14 222526" src="https://github.com/user-attachments/assets/364b1673-6f7e-412d-8cd6-2f6c0ac6f9d5" />
+<img width="1725" height="760" alt="Screenshot 2026-06-15 105850" src="https://github.com/user-attachments/assets/6ce9a8db-430d-4251-89b1-ef16efa121f8" />
+<img width="1887" height="567" alt="Screenshot 2026-06-15 105907" src="https://github.com/user-attachments/assets/b86f1684-d7b0-468e-862e-3cfe722e1558" />
+<img width="1902" height="801" alt="Screenshot 2026-06-15 110401" src="https://github.com/user-attachments/assets/b47e0e92-a410-4010-b656-e1f1febb1846" />
+<img width="1890" height="481" alt="Screenshot 2026-06-15 122240" src="https://github.com/user-attachments/assets/6c3e0c7d-4398-432b-aaa0-ca671008ecac" />
+<img width="1902" height="585" alt="Screenshot 2026-06-15 122456" src="https://github.com/user-attachments/assets/98a67d02-c04a-45d2-8dcb-7b6b1a368f03" />
+<img width="1902" height="571" alt="Screenshot 2026-06-15 122534" src="https://github.com/user-attachments/assets/4da7a550-c647-4d92-b16d-aa18dd47bdde" />
+
 
 ---
 
@@ -236,4 +240,4 @@ After deploying and configuring Appwrite:
 ---
 
 *Built for CodeAlpha Cloud Computing Internship — Task 2*  
-*© 2025 — Free to use and modify*
+*© 2026 — Free to use and modify*
